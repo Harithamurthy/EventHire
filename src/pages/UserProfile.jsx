@@ -1,0 +1,527 @@
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+  Container, Paper, Typography, Box, TextField, Button, Grid,
+  Avatar, Divider, Tab, Tabs, Alert, CircularProgress, IconButton,
+  Card, CardContent, Snackbar
+} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import { motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
+import { userAPI } from '../services/api';
+
+const UserProfile = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, currentUser, logout } = useAuth();
+  const [tabValue, setTabValue] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState({ show: false, message: '', type: 'info' });
+  
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    bio: '',
+    profilePicture: ''
+  });
+
+  // Load user data on component mount
+  useEffect(() => {
+    if (isAuthenticated && currentUser) {
+      // In a real app, you would fetch this from your API
+      setProfileData({
+        name: currentUser.displayName || 'User',
+        email: currentUser.email || 'user@example.com',
+        phone: '+91 9876543210',
+        address: 'Tirupattur, Tamil Nadu',
+        bio: 'Event organizer specializing in cultural gatherings and celebrations.',
+        profilePicture: currentUser.photoURL || ''
+      });
+    }
+  }, [isAuthenticated, currentUser]);
+
+  if (!isAuthenticated) {
+    return (
+      <Container maxWidth="sm" sx={{ mt: 8 }}>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h5" gutterBottom>Please login to view your profile</Typography>
+          <Button component={Link} to="/login" variant="contained" sx={{ mt: 2 }}>
+            Login
+          </Button>
+        </Paper>
+      </Container>
+    );
+  }
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setProfileData({
+      ...profileData,
+      [name]: value
+    });
+  };
+
+  const handleEditToggle = () => {
+    setIsEditing(!isEditing);
+    if (isEditing) {
+      // Save changes to localStorage
+      setLoading(true);
+      setTimeout(() => {
+        // Save profile data to localStorage
+        localStorage.setItem('userProfileData', JSON.stringify(profileData));
+        console.log('Profile data saved to localStorage:', profileData);
+        
+        setLoading(false);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }, 1000);
+    }
+  };
+
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Show loading state
+      setLoading(true);
+      
+      try {
+        // Create a FormData object to send the file
+        const formData = new FormData();
+        formData.append('profileImage', file);
+        
+        // Upload the file to the server
+        const response = await userAPI.uploadProfileImage(formData);
+        
+        // Get the image URL from the response
+        const imageUrl = response.data.data.imageUrl;
+        
+        // Update state with the new profile picture URL
+        const updatedProfileData = {
+          ...profileData,
+          profilePicture: `http://localhost:5000${imageUrl}`
+        };
+        
+        setProfileData(updatedProfileData);
+        
+        // Save to localStorage
+        localStorage.setItem('userProfileData', JSON.stringify(updatedProfileData));
+        
+        // Show success message
+        setUploadStatus({
+          show: true,
+          message: 'Profile picture uploaded successfully!',
+          type: 'success'
+        });
+        
+        console.log('Profile picture uploaded to server:', imageUrl);
+      } catch (error) {
+        console.error('Error uploading profile picture:', error);
+        
+        // Show error message
+        setUploadStatus({
+          show: true,
+          message: error.response?.data?.message || 'Failed to upload profile picture',
+          type: 'error'
+        });
+        
+        // Fallback to client-side handling if server upload fails
+        const reader = new FileReader();
+        reader.onload = () => {
+          const updatedProfileData = {
+            ...profileData,
+            profilePicture: reader.result
+          };
+          
+          setProfileData(updatedProfileData);
+          localStorage.setItem('userProfileData', JSON.stringify(updatedProfileData));
+        };
+        reader.readAsDataURL(file);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  // Handle closing the upload status snackbar
+  const handleCloseSnackbar = () => {
+    setUploadStatus(prev => ({ ...prev, show: false }));
+  };
+
+  // Custom text field styling
+  const textFieldStyle = {
+    '& .MuiInputLabel-root.Mui-focused': {
+      color: '#9c27b0'
+    },
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 2,
+      '& .MuiOutlinedInput-notchedOutline': {
+        borderColor: !isEditing ? '#e0e0e0' : '#9c27b0'
+      },
+      '&:hover .MuiOutlinedInput-notchedOutline': {
+        borderColor: !isEditing ? '#e0e0e0' : '#7b1fa2'
+      },
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: '#9c27b0'
+      }
+    }
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        {success && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Profile updated successfully!
+          </Alert>
+        )}
+        
+        <Card sx={{ 
+          maxWidth: { xs: '100%', md: '1000px' },
+          mx: 'auto',
+          borderRadius: 4,
+          overflow: 'hidden',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
+          aspectRatio: { xs: 'auto', md: '1/1' },
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' }
+        }}>
+          {/* Profile Header with User Info */}
+          <Box sx={{ 
+            background: 'linear-gradient(135deg, #7b1fa2 0%, #ce93d8 100%)',
+            width: { xs: '100%', md: '40%' },
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: 3,
+            color: 'white',
+            position: 'relative'
+          }}>
+            <Box sx={{ 
+              position: 'relative', 
+              width: 120, 
+              height: 120,
+              mb: 2 
+            }}>
+              <Avatar
+                src={profileData.profilePicture}
+                alt={profileData.name}
+                sx={{ 
+                  width: '100%', 
+                  height: '100%',
+                  border: '4px solid white',
+                  boxShadow: '0 5px 15px rgba(0,0,0,0.1)'
+                }}
+              />
+              <IconButton
+                sx={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  backgroundColor: 'white',
+                  '&:hover': { backgroundColor: '#f5f5f5' },
+                  color: '#9c27b0',
+                  p: 0.8,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                }}
+                component="label"
+                size="small"
+              >
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={handleProfilePictureChange}
+                />
+                <CameraAltIcon fontSize="small" />
+              </IconButton>
+            </Box>
+            
+            <Typography variant="h5" sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+              {profileData.name}
+            </Typography>
+            
+            <Typography variant="body2" sx={{ mb: 2, opacity: 0.9, textAlign: 'center' }}>
+              {profileData.email}
+            </Typography>
+            
+            <Divider sx={{ my: 2, width: '80%', borderColor: 'rgba(255,255,255,0.2)' }} />
+            
+            <Box sx={{ width: '100%', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, px: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: 'bold', width: '40%', color: 'white', opacity: 0.9 }}>
+                  Phone:
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'white' }}>
+                  {profileData.phone}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5, px: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: 'bold', width: '40%', color: 'white', opacity: 0.9 }}>
+                  Location:
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'white' }}>
+                  {profileData.address}
+                </Typography>
+              </Box>
+            </Box>
+            
+            <Button 
+              variant="contained"
+              onClick={handleLogout}
+              size="small"
+              sx={{ 
+                mt: 'auto', 
+                bgcolor: 'rgba(255,255,255,0.2)',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'rgba(255,255,255,0.3)'
+                },
+                borderRadius: 6,
+                px: 3
+              }}
+            >
+              Log Out
+            </Button>
+          </Box>
+          
+          {/* Profile Content */}
+          <Box sx={{ 
+            width: { xs: '100%', md: '60%' },
+            p: 3,
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5" component="h2" sx={{ color: '#9c27b0', fontWeight: 'medium' }}>
+                Profile Settings
+              </Typography>
+              <Button
+                variant={isEditing ? "contained" : "outlined"}
+                color="primary"
+                onClick={handleEditToggle}
+                startIcon={isEditing ? <SaveIcon /> : <EditIcon />}
+                disabled={loading}
+                size="small"
+                sx={{ 
+                  bgcolor: isEditing ? '#9c27b0' : 'transparent',
+                  borderColor: '#9c27b0',
+                  color: isEditing ? 'white' : '#9c27b0',
+                  '&:hover': {
+                    bgcolor: isEditing ? '#7b1fa2' : 'rgba(156, 39, 176, 0.04)',
+                    borderColor: '#7b1fa2'
+                  },
+                  borderRadius: 6,
+                  px: 2
+                }}
+              >
+                {loading ? (
+                  <CircularProgress size={20} />
+                ) : isEditing ? (
+                  "Save Changes"
+                ) : (
+                  "Edit Profile"
+                )}
+              </Button>
+            </Box>
+            
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+              <Tabs 
+                value={tabValue} 
+                onChange={handleTabChange} 
+                aria-label="profile tabs"
+                variant="fullWidth"
+                sx={{
+                  '& .MuiTabs-indicator': {
+                    backgroundColor: '#9c27b0',
+                  },
+                  '& .Mui-selected': {
+                    color: '#9c27b0',
+                    fontWeight: 'bold',
+                  },
+                }}
+              >
+                <Tab label="Personal Info" />
+                <Tab label="Security" />
+                <Tab label="Preferences" />
+              </Tabs>
+            </Box>
+              
+            <Box sx={{ overflowY: 'auto', flex: 1 }}>
+              {tabValue === 0 && (
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Full Name"
+                      name="name"
+                      value={profileData.name}
+                      onChange={handleInputChange}
+                      disabled={!isEditing || loading}
+                      variant="outlined"
+                      size="small"
+                      sx={textFieldStyle}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Email"
+                      name="email"
+                      type="email"
+                      value={profileData.email}
+                      onChange={handleInputChange}
+                      disabled={true} // Email changes often require verification
+                      variant="outlined"
+                      size="small"
+                      sx={textFieldStyle}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Phone Number"
+                      name="phone"
+                      value={profileData.phone}
+                      onChange={handleInputChange}
+                      disabled={!isEditing || loading}
+                      variant="outlined"
+                      size="small"
+                      sx={textFieldStyle}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Address"
+                      name="address"
+                      value={profileData.address}
+                      onChange={handleInputChange}
+                      disabled={!isEditing || loading}
+                      variant="outlined"
+                      size="small"
+                      sx={textFieldStyle}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Bio"
+                      name="bio"
+                      multiline
+                      rows={2}
+                      value={profileData.bio}
+                      onChange={handleInputChange}
+                      disabled={!isEditing || loading}
+                      variant="outlined"
+                      size="small"
+                      sx={textFieldStyle}
+                    />
+                  </Grid>
+                </Grid>
+              )}
+            
+              {tabValue === 1 && (
+                <Box>
+                  <Typography variant="h6" gutterBottom sx={{ color: '#9c27b0', fontWeight: 'medium', mb: 2, fontSize: '1rem' }}>
+                    Password Management
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    label="Current Password"
+                    type="password"
+                    sx={{ ...textFieldStyle, mb: 2 }}
+                    disabled={!isEditing || loading}
+                    variant="outlined"
+                    size="small"
+                  />
+                  <TextField
+                    fullWidth
+                    label="New Password"
+                    type="password"
+                    sx={{ ...textFieldStyle, mb: 2 }}
+                    disabled={!isEditing || loading}
+                    variant="outlined"
+                    size="small"
+                  />
+                  <TextField
+                    fullWidth
+                    label="Confirm New Password"
+                    type="password"
+                    sx={{ ...textFieldStyle, mb: 2 }}
+                    disabled={!isEditing || loading}
+                    variant="outlined"
+                    size="small"
+                  />
+                  <Button 
+                    variant="contained" 
+                    disabled={!isEditing || loading}
+                    size="small"
+                    sx={{ 
+                      mt: 1, 
+                      px: 3, 
+                      py: 1, 
+                      borderRadius: 6,
+                      bgcolor: '#9c27b0',
+                      '&:hover': {
+                        bgcolor: '#7b1fa2'
+                      }
+                    }}
+                  >
+                    {loading ? <CircularProgress size={20} /> : 'Update Password'}
+                  </Button>
+                </Box>
+              )}
+            
+              {tabValue === 2 && (
+                <Box sx={{ p: 2, bgcolor: '#f3e5f5', borderRadius: 2 }}>
+                  <Typography variant="h6" gutterBottom sx={{ color: '#9c27b0', fontWeight: 'medium', fontSize: '1rem' }}>
+                    Notification Preferences
+                  </Typography>
+                  <Typography paragraph sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>
+                    Configure your notification preferences here.
+                    This feature will be available soon.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </Card>
+        {/* Snackbar for upload status messages */}
+        <Snackbar
+          open={uploadStatus.show}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          message={uploadStatus.message}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          ContentProps={{
+            sx: {
+              bgcolor: uploadStatus.type === 'error' ? 'error.main' : 'success.main',
+              color: 'white'
+            }
+          }}
+        />
+      </Container>
+    </motion.div>
+  );
+};
+
+export default UserProfile;
