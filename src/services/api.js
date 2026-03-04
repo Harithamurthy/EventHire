@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with base URL
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: 'https://eventhire-1.onrender.com/api',
   headers: {
     'Content-Type': 'application/json'
   }
@@ -50,7 +50,7 @@ export const applicationAPI = {
 
 // Create a separate instance for file uploads with different content-type header
 const FileAPI = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: 'https://eventhire-1.onrender.com/api',
   headers: {
     'Content-Type': 'multipart/form-data'
   }
