@@ -50,7 +50,7 @@ export const applicationAPI = {
 
 // Create a separate instance for file uploads with different content-type header
 const FileAPI = axios.create({
-  baseURL: 'https://eventhire-1.onrender.com/api',
+  baseURL: 'https://eventhire-1.onrender.com',
   headers: {
     'Content-Type': 'multipart/form-data'
   }
